@@ -37,7 +37,8 @@ const MOCK_USER: User = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // For demo/template: Start with a default authenticated user
+  const [user, setUser] = useState<User | null>(MOCK_USER);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -49,7 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsed.user);
       } catch {
         localStorage.removeItem('partner_auth');
+        // Fallback to default mock user for demo
+        setUser(MOCK_USER);
       }
+    } else {
+      // For demo: Set default mock user if no stored auth
+      setUser(MOCK_USER);
+      localStorage.setItem('partner_auth', JSON.stringify({ user: MOCK_USER }));
     }
     setIsLoading(false);
   }, []);
