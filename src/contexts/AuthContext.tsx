@@ -1,23 +1,29 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
   company?: string;
   avatar?: string;
+  region?: string;
+  timezone?: string;
+  enabledTools?: string[];
+  onboardingCompleted?: boolean;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
+  completeOnboarding: (data: OnboardingData) => void;
 }
 
-interface RegisterData {
+export interface RegisterData {
   fullName: string;
   email: string;
   password: string;
@@ -26,19 +32,26 @@ interface RegisterData {
   whatsapp?: string;
 }
 
+export interface OnboardingData {
+  enabledTools: string[];
+  company?: string;
+  region?: string;
+  timezone?: string;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MOCK_USER: User = {
   id: 'usr_partner_001',
-  name: 'Alex Johnson',
-  email: 'alex@acmepartners.com',
+  name: 'Aman Natt',
+  email: 'aman@natt.com',             
   company: 'Acme Partners Ltd',
   avatar: undefined,
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // For demo/template: Start with a default authenticated user
-  const [user, setUser] = useState<User | null>(MOCK_USER);
+  // For demo/template: Start unauthenticated to show full flow
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -47,16 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedAuth) {
       try {
         const parsed = JSON.parse(storedAuth);
-        setUser(parsed.user);
+        let u = parsed.user;
+        // Migrate legacy Alex Johnson / alex@acmepartners.com to Aman Natt
+        if (u?.name === 'Alex Johnson' || u?.email === 'alex@acmepartners.com') {
+          u = { ...u, name: 'Aman Natt', email: 'aman@natt.com' };
+          localStorage.setItem('partner_auth', JSON.stringify({ user: u }));
+        }
+        setUser(u);
       } catch {
         localStorage.removeItem('partner_auth');
-        // Fallback to default mock user for demo
-        setUser(MOCK_USER);
       }
-    } else {
-      // For demo: Set default mock user if no stored auth
-      setUser(MOCK_USER);
-      localStorage.setItem('partner_auth', JSON.stringify({ user: MOCK_USER }));
     }
     setIsLoading(false);
   }, []);
@@ -79,9 +92,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: data.fullName,
       email: data.email,
       company: data.company,
+      onboardingCompleted: false,
     };
     setUser(newUser);
     localStorage.setItem('partner_auth', JSON.stringify({ user: newUser }));
+  };
+
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      localStorage.setItem('partner_auth', JSON.stringify({ user: updatedUser }));
+    }
+  };
+
+  const completeOnboarding = (data: OnboardingData) => {
+    if (user) {
+      const updatedUser: User = {
+        ...user,
+        enabledTools: data.enabledTools,
+        company: data.company || user.company,
+        region: data.region,
+        timezone: data.timezone,
+        onboardingCompleted: true,
+      };
+      setUser(updatedUser);
+      localStorage.setItem('partner_auth', JSON.stringify({ user: updatedUser }));
+    }
   };
 
   const logout = () => {
@@ -98,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        updateUser,
+        completeOnboarding,
       }}
     >
       {children}
