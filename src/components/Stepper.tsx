@@ -13,7 +13,7 @@ interface StepperProps {
 
 export function Stepper({ steps, currentStep }: StepperProps) {
   return (
-    <div className="flex items-center justify-center gap-2">
+    <div className="flex items-center justify-center gap-2 sm:gap-4">
       {steps.map((step, index) => {
         const isCompleted = step.id < currentStep;
         const isCurrent = step.id === currentStep;
@@ -23,21 +23,21 @@ export function Stepper({ steps, currentStep }: StepperProps) {
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
-                  isCompleted && "border-success bg-success text-success-foreground",
-                  isCurrent && "border-accent bg-accent text-accent-foreground",
+                  "flex h-11 w-11 items-center justify-center rounded-full border-2 transition-all duration-300 shadow-sm",
+                  isCompleted && "border-success bg-success text-success-foreground scale-105",
+                  isCurrent && "border-accent bg-accent text-accent-foreground ring-4 ring-accent/20 scale-110",
                   !isCompleted && !isCurrent && "border-border bg-background text-muted-foreground"
                 )}
               >
                 {isCompleted ? (
                   <Check className="h-5 w-5" />
                 ) : (
-                  <span className="text-sm font-medium">{step.id}</span>
+                  <span className="text-sm font-semibold">{step.id}</span>
                 )}
               </div>
               <span
                 className={cn(
-                  "mt-2 text-xs font-medium transition-colors",
+                  "mt-3 text-xs font-semibold transition-colors",
                   isCurrent ? "text-foreground" : "text-muted-foreground"
                 )}
               >
@@ -48,7 +48,7 @@ export function Stepper({ steps, currentStep }: StepperProps) {
             {index < steps.length - 1 && (
               <div
                 className={cn(
-                  "mx-2 h-0.5 w-12 sm:w-20 transition-colors",
+                  "mx-3 h-1 w-12 sm:w-20 rounded-full transition-all duration-300",
                   step.id < currentStep ? "bg-success" : "bg-border"
                 )}
               />

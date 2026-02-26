@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,8 +16,9 @@ interface ConfirmModalProps {
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   variant?: 'default' | 'destructive';
+  confirmDisabled?: boolean;
 }
 
 export function ConfirmModal({
@@ -28,7 +30,23 @@ export function ConfirmModal({
   cancelLabel = 'Cancel',
   onConfirm,
   variant = 'default',
+  confirmDisabled = false,
 }: ConfirmModalProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsLoading(true);
+    try {
+      const result = onConfirm();
+      if (result && typeof (result as Promise<unknown>).then === 'function') {
+        await result;
+      }
+      onOpenChange(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -37,15 +55,13 @@ export function ConfirmModal({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             {cancelLabel}
           </Button>
           <Button
             variant={variant === 'destructive' ? 'destructive' : 'default'}
-            onClick={() => {
-              onConfirm();
-              onOpenChange(false);
-            }}
+            onClick={handleConfirm}
+            disabled={confirmDisabled || isLoading}
           >
             {confirmLabel}
           </Button>

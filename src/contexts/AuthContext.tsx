@@ -1,23 +1,30 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authApi, setAuth, clearAuth, getToken } from '@/lib/api';
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
   company?: string;
   avatar?: string;
+  region?: string;
+  timezone?: string;
+  enabledTools?: string[];
+  onboardingCompleted?: boolean;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
+  completeOnboarding: (data: OnboardingData) => void;
 }
 
-interface RegisterData {
+export interface RegisterData {
   fullName: string;
   email: string;
   password: string;
@@ -26,60 +33,114 @@ interface RegisterData {
   whatsapp?: string;
 }
 
+export interface OnboardingData {
+  enabledTools: string[];
+  company?: string;
+  region?: string;
+  timezone?: string;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MOCK_USER: User = {
-  id: 'usr_partner_001',
-  name: 'Alex Johnson',
-  email: 'alex@acmepartners.com',
-  company: 'Acme Partners Ltd',
-  avatar: undefined,
-};
+function toUser(apiUser: { id: number; name: string; email: string }): User {
+  return {
+    id: String(apiUser.id),
+    name: apiUser.name,
+    email: apiUser.email,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check localStorage for mock auth state
-    const storedAuth = localStorage.getItem('partner_auth');
-    if (storedAuth) {
-      try {
-        const parsed = JSON.parse(storedAuth);
-        setUser(parsed.user);
-      } catch {
-        localStorage.removeItem('partner_auth');
-      }
+    let cancelled = false;
+    const token = getToken();
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    authApi
+      .me()
+      .then((res) => {
+        if (!cancelled && res.user) {
+          setUser(toUser(res.user));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearAuth();
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (email: string, _password: string): Promise<void> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const loggedInUser = { ...MOCK_USER, email };
-    setUser(loggedInUser);
-    localStorage.setItem('partner_auth', JSON.stringify({ user: loggedInUser }));
+  const login = async (email: string, password: string): Promise<void> => {
+    const res = await authApi.login(email, password);
+    const u = toUser(res.user);
+    setAuth(res.token, res.user);
+    setUser(u);
   };
 
   const register = async (data: RegisterData): Promise<void> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newUser: User = {
-      id: 'usr_partner_' + Date.now(),
-      name: data.fullName,
-      email: data.email,
-      company: data.company,
-    };
-    setUser(newUser);
-    localStorage.setItem('partner_auth', JSON.stringify({ user: newUser }));
+    const res = await authApi.register(data.fullName, data.email, data.password);
+    const u = toUser(res.user);
+    setAuth(res.token, res.user);
+    setUser(u);
+  };
+
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      const stored = localStorage.getItem('partner_auth');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          parsed.user = updatedUser;
+          localStorage.setItem('partner_auth', JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
+    }
+  };
+
+  const completeOnboarding = (data: OnboardingData) => {
+    if (user) {
+      const updatedUser: User = {
+        ...user,
+        enabledTools: data.enabledTools,
+        company: data.company || user.company,
+        region: data.region,
+        timezone: data.timezone,
+        onboardingCompleted: true,
+      };
+      setUser(updatedUser);
+      const stored = localStorage.getItem('partner_auth');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          parsed.user = updatedUser;
+          localStorage.setItem('partner_auth', JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('partner_auth');
+    clearAuth();
   };
 
   return (
@@ -91,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        updateUser,
+        completeOnboarding,
       }}
     >
       {children}
