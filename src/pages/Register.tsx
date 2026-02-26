@@ -74,10 +74,10 @@ export default function Register() {
       
       toast({
         title: 'Account created!',
-        description: 'Welcome to the Partner Portal. Let\'s set up your account.',
+        description: 'Welcome to the Partner Portal.',
       });
-      
-      setTimeout(() => navigate('/onboarding'), 500);
+
+      setTimeout(() => navigate('/dashboard'), 500);
     } catch {
       toast({
         title: 'Registration failed',

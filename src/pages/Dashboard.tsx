@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,10 +32,12 @@ import {
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { usePartners } from '@/contexts/PartnersContext';
 import { useToast } from '@/hooks/use-toast';
+import { usersApi } from '@/lib/api';
 import {
   Users,
   UserPlus,
   Copy,
+  Pencil,
   Eye,
   EyeOff,
   RefreshCw,
@@ -55,7 +58,7 @@ const tools = [
   { id: 'msgchat', name: 'MsgChat', icon: MessageCircle },
 ];
 export default function Dashboard() {
-  const { partners, isLoading, addPartner, deletePartner, regeneratePassword } = usePartners();
+  const { partners, isLoading, addPartner, deletePartner, regeneratePassword, refreshPartners } = usePartners();
   const { toast } = useToast();
   
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
@@ -67,6 +70,9 @@ export default function Dashboard() {
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false);
   const [partnerToRegenerate, setPartnerToRegenerate] = useState<{ id: string; name: string; username: string } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isEditPartnerOpen, setIsEditPartnerOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [partnerToEdit, setPartnerToEdit] = useState<Partner | null>(null);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
   const [newPartnerCredentials, setNewPartnerCredentials] = useState<{ username: string; password: string; name: string } | null>(null);
 
@@ -77,6 +83,16 @@ export default function Dashboard() {
     region: '',
     timezone: '',
     enabledTools: [] as string[],
+    telegram: '',
+    whatsapp: '',
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    region: '',
+    timezone: '',
     telegram: '',
     whatsapp: '',
   });
@@ -226,6 +242,63 @@ export default function Dashboard() {
     }));
   };
 
+  const openEditPartner = (partner: Partner) => {
+    setPartnerToEdit(partner);
+    setEditFormData({
+      name: partner.name || '',
+      email: partner.email || '',
+      company: partner.company || '',
+      region: partner.region || '',
+      timezone: partner.timezone || '',
+      telegram: partner.telegram || '',
+      whatsapp: partner.whatsapp || '',
+    });
+    setIsEditPartnerOpen(true);
+  };
+
+  const handleUpdatePartner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!partnerToEdit) return;
+    if (!editFormData.name.trim() || !editFormData.email.trim()) {
+      toast({
+        title: 'Validation error',
+        description: 'Name and email are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const id = parseInt(partnerToEdit.id, 10);
+      await usersApi.update(id, {
+        name: editFormData.name.trim(),
+        email: editFormData.email.trim(),
+        company: editFormData.company || undefined,
+        region: editFormData.region || undefined,
+        timezone: editFormData.timezone || undefined,
+        telegram: editFormData.telegram || undefined,
+        whatsapp: editFormData.whatsapp || undefined,
+      });
+      await refreshPartners();
+      setIsEditPartnerOpen(false);
+      setPartnerToEdit(null);
+      toast({
+        title: 'Partner updated',
+        description: 'Partner information has been updated successfully.',
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to update partner.';
+      toast({
+        title: 'Error',
+        description: msg,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
@@ -259,22 +332,56 @@ export default function Dashboard() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Partner Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Platform Users</h1>
             <p className="mt-2 text-lg text-muted-foreground">
-              Manage affiliate partners and generate login credentials
+              Manage platform users (local DB) separately from satellite users
             </p>
           </div>
-          <Button size="lg" onClick={() => setIsAddPartnerOpen(true)} className="h-11">
-            <UserPlus className="h-4 w-4" />
-            Add Partner
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="lg" onClick={() => setIsAddPartnerOpen(true)} className="h-11">
+              <UserPlus className="h-4 w-4" />
+              Add Partner
+            </Button>
+            <Button size="lg" variant="outline" asChild className="h-11">
+              <Link to="/dashboard/satellites/users">Satellite Users</Link>
+            </Button>
+          </div>
+        </div>
+
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Platform Users</CardTitle>
+              <CardDescription>
+                Local users stored in the main platform database.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" asChild>
+                <Link to="/dashboard">Open platform users</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Satellite Users</CardTitle>
+              <CardDescription>
+                Users managed directly on MsgChat, TeleBulk and RebTools.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" asChild>
+                <Link to="/dashboard/satellites/users">Open satellite users</Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Stats Cards */}
         <div className="grid gap-4 mb-8 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="animate-fade-in-up shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Partners</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Platform Users</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -313,9 +420,9 @@ export default function Dashboard() {
         {/* Partners Table */}
         <Card className="animate-fade-in-up animation-delay-400 shadow-lg">
           <CardHeader>
-            <CardTitle>All Partners</CardTitle>
+            <CardTitle>All Platform Users</CardTitle>
             <CardDescription>
-              View and manage all affiliate partners in the system
+              Users stored in the local platform database (`partners_portal.users`)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -324,10 +431,10 @@ export default function Dashboard() {
             ) : partners.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">No partners yet</p>
+                <p className="text-muted-foreground mb-4">No platform users yet</p>
                 <Button onClick={() => setIsAddPartnerOpen(true)}>
                   <UserPlus className="h-4 w-4 mr-2" />
-                  Add your first partner
+                  Add first platform user
                 </Button>
               </div>
             ) : (
@@ -424,6 +531,14 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditPartner(partner)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -612,6 +727,102 @@ export default function Dashboard() {
               </Button>
               <Button type="submit" disabled={isCreating}>
                 {isCreating ? 'Creating...' : 'Create Partner'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Partner Dialog */}
+      <Dialog open={isEditPartnerOpen} onOpenChange={setIsEditPartnerOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Partner</DialogTitle>
+            <DialogDescription>
+              Update partner profile information.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdatePartner} className="space-y-5">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Full Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email *</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-company">Company / Brand</Label>
+              <Input
+                id="edit-company"
+                value={editFormData.company}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, company: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-region">Region</Label>
+                <Input
+                  id="edit-region"
+                  value={editFormData.region}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, region: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-timezone">Timezone</Label>
+                <Input
+                  id="edit-timezone"
+                  value={editFormData.timezone}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, timezone: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-telegram">Telegram Username</Label>
+                <Input
+                  id="edit-telegram"
+                  value={editFormData.telegram}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, telegram: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-whatsapp">WhatsApp Number</Label>
+                <Input
+                  id="edit-whatsapp"
+                  value={editFormData.whatsapp}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, whatsapp: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditPartnerOpen(false)}
+                disabled={isUpdating}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? 'Saving...' : 'Save changes'}
               </Button>
             </DialogFooter>
           </form>

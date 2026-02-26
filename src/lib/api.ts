@@ -37,6 +37,7 @@ async function apiRequest<T>(
     'Content-Type': 'application/json',
   };
   const token = options?.skipAuth ? null : getToken();
+  const hadToken = Boolean(token);
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -56,9 +57,11 @@ async function apiRequest<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401 && !options?.skipAuth) {
+    if (res.status === 401 && !options?.skipAuth && hadToken) {
       clearAuth();
-      window.location.assign('/login');
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
     }
     const err = new Error((data as { error?: string })?.error || `Request failed: ${res.status}`) as ApiError;
     err.status = res.status;
@@ -156,8 +159,51 @@ export interface ProvisionResponse {
   data: Record<string, { success: boolean; satellite_user_id?: string; error?: string }>;
 }
 
+export interface SatelliteActiveResponse {
+  success: boolean;
+  active: string;
+}
+
+export interface SatelliteUsersResponse<T = Record<string, unknown>> {
+  success: boolean;
+  data: T[];
+}
+
 export const satellitesApi = {
   list: () => apiRequest<SatellitesResponse>('GET', '/api/satellites'),
+  getActive: (sessionId?: string) =>
+    apiRequest<SatelliteActiveResponse>(
+      'GET',
+      sessionId ? `/api/satellites/active?sessionId=${encodeURIComponent(sessionId)}` : '/api/satellites/active'
+    ),
+  setActive: (satellite: string, sessionId?: string) =>
+    apiRequest<SatelliteActiveResponse>('POST', '/api/satellites/active', { satellite, sessionId }),
+  listUsers: (satellite: string) =>
+    apiRequest<SatelliteUsersResponse>('GET', `/api/satellites/${encodeURIComponent(satellite)}/users`),
+  createUser: (
+    satellite: string,
+    payload: Record<string, unknown>
+  ) => apiRequest<{ success: boolean; data: { id: string | number } }>(
+    'POST',
+    `/api/satellites/${encodeURIComponent(satellite)}/users`,
+    payload
+  ),
+  updateUser: (
+    satellite: string,
+    id: string | number,
+    payload: Record<string, unknown>
+  ) =>
+    satellite === 'telebulk'
+      ? apiRequest<{ success: boolean }>(
+          'PUT',
+          `/api/satellites/${encodeURIComponent(satellite)}/users/edit`,
+          payload
+        )
+      : apiRequest<{ success: boolean }>(
+          'PUT',
+          `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(id))}`,
+          payload
+        ),
   provision: (userId: number, satellites: string[], password: string) =>
     apiRequest<ProvisionResponse>('POST', '/api/satellites/provision', {
       userId,

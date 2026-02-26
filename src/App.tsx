@@ -5,12 +5,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PartnersProvider } from "@/contexts/PartnersContext";
+import { SatelliteProvider } from "@/contexts/SatelliteContext";
 import Index from "./pages/Index";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
-import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
+import SatelliteUsers from "./pages/SatelliteUsers";
 import ToolPlaceholder from "./pages/ToolPlaceholder";
 import NotFound from "./pages/NotFound";
 
@@ -36,10 +37,15 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset" element={<ResetPassword />} />
-      <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={
         <DashboardGuard>
           <Dashboard />
+        </DashboardGuard>
+      } />
+      <Route path="/dashboard/satellites/users" element={
+        <DashboardGuard>
+          <SatelliteUsers />
         </DashboardGuard>
       } />
       <Route path="/tool/:toolId" element={<ToolPlaceholder />} />
@@ -55,9 +61,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <PartnersProvider>
-            <AppRoutes />
-          </PartnersProvider>
+          <SatelliteProvider>
+            <PartnersProvider>
+              <AppRoutes />
+            </PartnersProvider>
+          </SatelliteProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

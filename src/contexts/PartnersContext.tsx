@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { usersApi, satellitesApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Partner {
   id: string;
@@ -87,8 +88,14 @@ function apiUserToPartner(u: {
 export function PartnersProvider({ children }: { children: ReactNode }) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const refreshPartners = useCallback(async () => {
+    if (!isAuthenticated) {
+      setPartners([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       const res = await usersApi.list();
       setPartners((res.data || []).map(apiUserToPartner));
@@ -97,9 +104,18 @@ export function PartnersProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
+    if (isAuthLoading) {
+      setIsLoading(true);
+      return;
+    }
+    if (!isAuthenticated) {
+      setPartners([]);
+      setIsLoading(false);
+      return;
+    }
     let cancelled = false;
     setIsLoading(true);
     usersApi
@@ -118,7 +134,7 @@ export function PartnersProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthenticated, isAuthLoading]);
 
   const addPartner = async (data: NewPartnerData): Promise<Partner> => {
     const password = generatePassword();
@@ -135,7 +151,9 @@ export function PartnersProvider({ children }: { children: ReactNode }) {
     });
     const userId = createRes.data.id;
 
-    const satelliteSlugs = (data.enabledTools || []).filter((s) => s === 'msgchat' || s === 'telebulk');
+    const satelliteSlugs = (data.enabledTools || []).filter(
+      (s) => s === 'msgchat' || s === 'telebulk' || s === 'rebatetools'
+    );
     if (satelliteSlugs.length > 0) {
       try {
         await satellitesApi.provision(userId, satelliteSlugs, password);
@@ -148,7 +166,7 @@ export function PartnersProvider({ children }: { children: ReactNode }) {
         };
         setPartners((prev) => [...prev, newPartner]);
         throw new Error(
-          'Partner created, but provisioning to MsgChat/TeleBulk failed. Check that MSGCHAT_API_URL and TELEBULK_API_URL are set.'
+          'Partner created, but provisioning to one or more satellites failed. Check MSGCHAT_API_URL, TELEBULK_API_URL and REBATETOOLS_DB_* variables.'
         );
       }
     }
