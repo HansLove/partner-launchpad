@@ -65,7 +65,8 @@ export default function Dashboard() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<string | null>(null);
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false);
-  const [partnerToRegenerate, setPartnerToRegenerate] = useState<string | null>(null);
+  const [partnerToRegenerate, setPartnerToRegenerate] = useState<{ id: string; name: string; username: string } | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
   const [newPartnerCredentials, setNewPartnerCredentials] = useState<{ username: string; password: string; name: string } | null>(null);
 
@@ -148,9 +149,10 @@ export default function Dashboard() {
       setIsAddPartnerOpen(false);
       setSelectedPartner(newPartner.id);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to create partner. Please try again.';
       toast({
         title: 'Error',
-        description: 'Failed to create partner. Please try again.',
+        description: msg,
         variant: 'destructive',
       });
     } finally {
@@ -166,27 +168,52 @@ export default function Dashboard() {
     });
   };
 
-  const handleDelete = () => {
-    if (partnerToDelete) {
-      deletePartner(partnerToDelete);
+  const handleDelete = async () => {
+    if (!partnerToDelete) return;
+    try {
+      await deletePartner(partnerToDelete);
       toast({
         title: 'Partner deleted',
         description: 'The partner has been removed.',
       });
       setIsDeleteModalOpen(false);
       setPartnerToDelete(null);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to delete partner.';
+      toast({
+        title: 'Error',
+        description: msg,
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleRegenerate = () => {
-    if (partnerToRegenerate) {
-      regeneratePassword(partnerToRegenerate);
-      toast({
-        title: 'Password regenerated',
-        description: 'New password has been generated.',
+  const handleRegenerate = async () => {
+    if (!partnerToRegenerate) return;
+    setIsRegenerating(true);
+    try {
+      const newPassword = await regeneratePassword(partnerToRegenerate.id);
+      setNewPartnerCredentials({
+        username: partnerToRegenerate.username,
+        password: newPassword,
+        name: partnerToRegenerate.name,
       });
+      setIsCredentialsModalOpen(true);
       setIsRegenerateModalOpen(false);
       setPartnerToRegenerate(null);
+      toast({
+        title: 'Password regenerated',
+        description: 'Save the new password — it will not be shown again.',
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to regenerate password.';
+      toast({
+        title: 'Error',
+        description: msg,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -356,31 +383,37 @@ export default function Dashboard() {
                             </div>
                             <div className="flex items-center gap-1.5">
                               <code className="text-xs bg-secondary px-2 py-1 rounded font-mono">
-                                {showPasswords[partner.id] ? partner.password : '••••••••'}
+                                {partner.password
+                                  ? (showPasswords[partner.id] ? partner.password : '••••••••')
+                                  : '—'}
                               </code>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setShowPasswords(prev => ({
-                                  ...prev,
-                                  [partner.id]: !prev[partner.id],
-                                }))}
-                              >
-                                {showPasswords[partner.id] ? (
-                                  <EyeOff className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Eye className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => handleCopy(partner.password, 'Password')}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
+                              {partner.password && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => setShowPasswords(prev => ({
+                                      ...prev,
+                                      [partner.id]: !prev[partner.id],
+                                    }))}
+                                  >
+                                    {showPasswords[partner.id] ? (
+                                      <EyeOff className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <Eye className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handleCopy(partner.password, 'Password')}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -396,7 +429,11 @@ export default function Dashboard() {
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => {
-                                setPartnerToRegenerate(partner.id);
+                                setPartnerToRegenerate({
+                                  id: partner.id,
+                                  name: partner.name,
+                                  username: partner.username,
+                                });
                                 setIsRegenerateModalOpen(true);
                               }}
                             >

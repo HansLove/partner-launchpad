@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authApi, setAuth, clearAuth, getToken } from '@/lib/api';
 
 export interface User {
   id: string;
@@ -41,68 +42,75 @@ export interface OnboardingData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MOCK_USER: User = {
-  id: 'usr_partner_001',
-  name: 'Aman Natt',
-  email: 'aman@natt.com',             
-  company: 'Acme Partners Ltd',
-  avatar: undefined,
-};
+function toUser(apiUser: { id: number; name: string; email: string }): User {
+  return {
+    id: String(apiUser.id),
+    name: apiUser.name,
+    email: apiUser.email,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // For demo/template: Start unauthenticated to show full flow
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check localStorage for mock auth state
-    const storedAuth = localStorage.getItem('partner_auth');
-    if (storedAuth) {
-      try {
-        const parsed = JSON.parse(storedAuth);
-        let u = parsed.user;
-        // Migrate legacy Alex Johnson / alex@acmepartners.com to Aman Natt
-        if (u?.name === 'Alex Johnson' || u?.email === 'alex@acmepartners.com') {
-          u = { ...u, name: 'Aman Natt', email: 'aman@natt.com' };
-          localStorage.setItem('partner_auth', JSON.stringify({ user: u }));
-        }
-        setUser(u);
-      } catch {
-        localStorage.removeItem('partner_auth');
-      }
+    let cancelled = false;
+    const token = getToken();
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    authApi
+      .me()
+      .then((res) => {
+        if (!cancelled && res.user) {
+          setUser(toUser(res.user));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearAuth();
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (email: string, _password: string): Promise<void> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const loggedInUser = { ...MOCK_USER, email };
-    setUser(loggedInUser);
-    localStorage.setItem('partner_auth', JSON.stringify({ user: loggedInUser }));
+  const login = async (email: string, password: string): Promise<void> => {
+    const res = await authApi.login(email, password);
+    const u = toUser(res.user);
+    setAuth(res.token, res.user);
+    setUser(u);
   };
 
   const register = async (data: RegisterData): Promise<void> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newUser: User = {
-      id: 'usr_partner_' + Date.now(),
-      name: data.fullName,
-      email: data.email,
-      company: data.company,
-      onboardingCompleted: false,
-    };
-    setUser(newUser);
-    localStorage.setItem('partner_auth', JSON.stringify({ user: newUser }));
+    const res = await authApi.register(data.fullName, data.email, data.password);
+    const u = toUser(res.user);
+    setAuth(res.token, res.user);
+    setUser(u);
   };
 
   const updateUser = (updates: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
-      localStorage.setItem('partner_auth', JSON.stringify({ user: updatedUser }));
+      const stored = localStorage.getItem('partner_auth');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          parsed.user = updatedUser;
+          localStorage.setItem('partner_auth', JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
     }
   };
 
@@ -117,13 +125,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onboardingCompleted: true,
       };
       setUser(updatedUser);
-      localStorage.setItem('partner_auth', JSON.stringify({ user: updatedUser }));
+      const stored = localStorage.getItem('partner_auth');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          parsed.user = updatedUser;
+          localStorage.setItem('partner_auth', JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
     }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('partner_auth');
+    clearAuth();
   };
 
   return (
