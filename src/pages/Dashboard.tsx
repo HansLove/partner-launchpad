@@ -54,7 +54,6 @@ const tools = [
   { id: 'telebulk', name: 'Telebulk', icon: Send },
   { id: 'msgchat', name: 'MsgChat', icon: MessageCircle },
 ];
-
 export default function Dashboard() {
   const { partners, isLoading, addPartner, deletePartner, regeneratePassword } = usePartners();
   const { toast } = useToast();
