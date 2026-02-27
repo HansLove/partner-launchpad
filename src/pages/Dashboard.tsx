@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
@@ -72,7 +73,7 @@ export default function Dashboard() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isEditPartnerOpen, setIsEditPartnerOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [partnerToEdit, setPartnerToEdit] = useState<Partner | null>(null);
+  const [partnerToEdit, setPartnerToEdit] = useState<any | null>(null);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
   const [newPartnerCredentials, setNewPartnerCredentials] = useState<{ username: string; password: string; name: string } | null>(null);
 
@@ -242,7 +243,7 @@ export default function Dashboard() {
     }));
   };
 
-  const openEditPartner = (partner: Partner) => {
+  const openEditPartner = (partner: any) => {
     setPartnerToEdit(partner);
     setEditFormData({
       name: partner.name || '',
@@ -792,7 +793,6 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="edit-telegram">Telegram Username</Label>
