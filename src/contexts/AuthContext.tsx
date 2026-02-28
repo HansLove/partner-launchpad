@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi, setAuth, clearAuth, getToken } from '@/lib/api';
-
 export interface User {
   id: string;
   name: string;
