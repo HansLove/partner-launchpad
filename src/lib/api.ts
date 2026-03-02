@@ -87,8 +87,6 @@ export interface MeResponse {
 export const authApi = {
   login: (email: string, password: string) =>
     apiRequest<LoginResponse>('POST', '/api/auth/login', { email, password }, { skipAuth: true }),
-  register: (name: string, email: string, password: string) =>
-    apiRequest<LoginResponse>('POST', '/api/auth/register', { name, email, password }, { skipAuth: true }),
   me: () => apiRequest<MeResponse>('GET', '/api/auth/me'),
 };
 

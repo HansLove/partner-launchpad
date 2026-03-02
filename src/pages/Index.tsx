@@ -47,18 +47,15 @@ export default function Index() {
               Partner Access
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl animate-fade-in animation-delay-200">
-              Create your affiliate login to access powerful tools for analytics, messaging, and partner management.
+              Sign in to access powerful tools for analytics, messaging, and partner management.
             </p>
             
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in animation-delay-300">
               <Button size="xl" className="group" asChild>
-                <Link to="/register">
-                  Create account
+                <Link to="/login">
+                  Sign in
                   <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
-              </Button>
-              <Button size="xl" variant="outline" asChild>
-                <Link to="/login">Sign in</Link>
               </Button>
             </div>
           </div>
@@ -95,11 +92,11 @@ export default function Index() {
           <div className="mx-auto max-w-2xl animate-fade-in">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to get started?</h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Join our partner network and start growing your business with powerful affiliate tools.
+              This portal is restricted. If you have access, use your credentials to sign in.
             </p>
             <Button size="lg" className="mt-8 group" asChild>
-              <Link to="/register">
-                Create your account
+              <Link to="/login">
+                Go to sign in
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>

@@ -78,11 +78,8 @@ export function Header() {
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/login">Sign in</Link>
-              </Button>
               <Button size="sm" asChild>
-                <Link to="/register">Create account</Link>
+                <Link to="/login">Sign in</Link>
               </Button>
             </>
           )}

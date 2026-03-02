@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PartnersProvider } from "@/contexts/PartnersContext";
 import { SatelliteProvider } from "@/contexts/SatelliteContext";
 import Index from "./pages/Index";
-import Register from "./pages/Register";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
@@ -34,7 +33,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
-      <Route path="/register" element={<Register />} />
+      {/* Registration is disabled: redirect any /register access to /login */}
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset" element={<ResetPassword />} />
       <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
