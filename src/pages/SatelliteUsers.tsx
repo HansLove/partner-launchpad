@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSatellite } from '@/contexts/SatelliteContext';
 import { satellitesApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Pencil, RefreshCw, UserPlus } from 'lucide-react';
+import { Pencil, RefreshCw, UserPlus, Trash2 } from 'lucide-react';
 
 type Row = Record<string, unknown>;
 
@@ -72,6 +72,9 @@ export default function SatelliteUsers() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<Row | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState<Row | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [createData, setCreateData] = useState({
     name: '',
     email: '',
@@ -139,6 +142,31 @@ export default function SatelliteUsers() {
       status: String(row.status ?? '1'),
     });
     setIsEditOpen(true);
+  };
+
+  function getDeleteIdentifier(row: Row): string | number {
+    if (activeSatellite === 'telebulk') {
+      return String(row.userName ?? row.username ?? row.email ?? row.id ?? '');
+    }
+    return row.id ?? row._id ?? '';
+  }
+
+  const handleDelete = async () => {
+    if (!rowToDelete) return;
+    const identifier = getDeleteIdentifier(rowToDelete);
+    setIsDeleting(true);
+    try {
+      await satellitesApi.deleteUser(activeSatellite, identifier);
+      toast({ title: 'User deleted', description: 'Satellite user was removed.' });
+      setIsDeleteOpen(false);
+      setRowToDelete(null);
+      await loadUsers();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to delete user.';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleUpdate = async (e: FormEvent) => {
@@ -290,9 +318,23 @@ export default function SatelliteUsers() {
                           ) : col === 'rol' && activeSatellite === 'rebatetools' ? (
                             <Badge variant="outline">{getRebToolsRoleLabel(row.rol)}</Badge>
                           ) : col === 'actions' ? (
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit user">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                            <span className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit user">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setRowToDelete(row);
+                                  setIsDeleteOpen(true);
+                                }}
+                                title="Delete user"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </span>
                           ) : (
                             String(row[col] ?? '')
                           )}
@@ -560,6 +602,30 @@ export default function SatelliteUsers() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onOpenChange={(open) => { if (!open) { setIsDeleteOpen(false); setRowToDelete(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete satellite user</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this user from {getDisplayName(activeSatellite, satellites)}? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setIsDeleteOpen(false); setRowToDelete(null); }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void handleDelete()} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete user'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Layout>

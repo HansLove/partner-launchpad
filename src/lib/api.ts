@@ -202,6 +202,11 @@ export const satellitesApi = {
           `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(id))}`,
           payload
         ),
+  deleteUser: (satellite: string, identifier: string | number) =>
+    apiRequest<{ success: boolean }>(
+      'DELETE',
+      `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(identifier))}`
+    ),
   provision: (userId: number, satellites: string[], password: string) =>
     apiRequest<ProvisionResponse>('POST', '/api/satellites/provision', {
       userId,
