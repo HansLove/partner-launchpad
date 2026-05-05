@@ -114,6 +114,7 @@ export default function SatelliteUsers() {
 
   useEffect(() => {
     void loadUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSatellite]);
 
   const tableColumns = useMemo(() => {
@@ -148,7 +149,8 @@ export default function SatelliteUsers() {
     if (activeSatellite === 'telebulk') {
       return String(row.userName ?? row.username ?? row.email ?? row.id ?? '');
     }
-    return row.id ?? row._id ?? '';
+    // return row.id ?? row._id ?? '';
+    return String(row.id ?? row._id ?? '');
   }
 
   const handleDelete = async () => {
@@ -215,7 +217,7 @@ export default function SatelliteUsers() {
       return;
     }
     if (activeSatellite === 'rebatetools' && !createData.name) {
-      toast({ title: 'Validation', description: 'Name is required for RebTools.', variant: 'destructive' });
+      toast({ title: 'Validation', description: 'Name is required for Rebatetools.', variant: 'destructive' });
       return;
     }
 

@@ -50,6 +50,7 @@ export function Header() {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
+                
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">

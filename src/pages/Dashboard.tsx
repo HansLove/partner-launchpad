@@ -367,7 +367,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="text-lg">Satellite Users</CardTitle>
               <CardDescription>
-                Users managed directly on MsgChat, TeleBulk and RebTools.
+                Users managed directly on MsgChat, TeleBulk and Rebatetools.
               </CardDescription>
             </CardHeader>
             <CardContent>
