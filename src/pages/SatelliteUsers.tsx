@@ -177,13 +177,47 @@ export default function SatelliteUsers() {
     setIsUpdating(true);
     try {
       if (activeSatellite === 'rebatetools') {
-        await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
+        const response = await satellitesApi.updateRebToolsUser(String(editingRow.id), {
           name: editData.name,
           email: editData.email,
           password: editData.password || undefined,
           rol: Number(editData.rol),
           status: Number(editData.status),
         });
+        const emailState = response?.data;
+        if (!emailState?.activationEmailAttempted) {
+          toast({
+            title: 'User updated (no email)',
+            description: 'No activation email was sent because this change did not trigger it.',
+          });
+        } else if (emailState.activationEmailError) {
+          toast({
+            title: 'User updated (email failed)',
+            description: emailState.activationEmailError,
+            variant: 'destructive',
+          });
+        } else if (emailState.activationEmailSkipped) {
+          toast({
+            title: 'User updated (email skipped)',
+            description: 'Activation email was skipped due to email service configuration.',
+            variant: 'destructive',
+          });
+        } else if (emailState.activationEmailSent) {
+          const reason =
+            emailState.activationEmailTrigger === 'status_activated'
+              ? 'status changed to Active'
+              : 'role changed to Admin';
+          toast({
+            title: 'User updated (email sent)',
+            description: `Activation email sent (${reason}).`,
+          });
+        } else {
+          toast({
+            title: 'User updated (email not sent)',
+            description: 'Activation email was attempted but was not sent.',
+            variant: 'destructive',
+          });
+        }
       } else if (activeSatellite === 'msgchat') {
         await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
           email: editData.email,
@@ -197,8 +231,11 @@ export default function SatelliteUsers() {
           userName: editData.userName || editData.email,
           ...(editData.password ? { password: editData.password } : {}),
         });
+        toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
       }
-      toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
+      if (activeSatellite === 'msgchat') {
+        toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
+      }
       setIsEditOpen(false);
       setEditingRow(null);
       await loadUsers();

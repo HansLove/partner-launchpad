@@ -167,6 +167,18 @@ export interface SatelliteUsersResponse<T = Record<string, unknown>> {
   data: T[];
 }
 
+export interface RebToolsUpdateResponse {
+  success: boolean;
+  data?: {
+    activationEmailAttempted?: boolean;
+    activationEmailTrigger?: 'status_activated' | 'role_promoted_to_admin' | null;
+    activationEmailSent?: boolean;
+    activationEmailSkipped?: boolean;
+    activationEmailError?: string | null;
+    activationEmailMessageId?: string | null;
+  };
+}
+
 export const satellitesApi = {
   list: () => apiRequest<SatellitesResponse>('GET', '/api/satellites'),
   getActive: (sessionId?: string) =>
@@ -202,6 +214,15 @@ export const satellitesApi = {
           `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(id))}`,
           payload
         ),
+  updateRebToolsUser: (
+    id: string | number,
+    payload: Record<string, unknown>
+  ) =>
+    apiRequest<RebToolsUpdateResponse>(
+      'PUT',
+      `/api/satellites/rebatetools/users/${encodeURIComponent(String(id))}`,
+      payload
+    ),
   deleteUser: (satellite: string, identifier: string | number) =>
     apiRequest<{ success: boolean }>(
       'DELETE',
