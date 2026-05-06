@@ -167,6 +167,16 @@ export interface SatelliteUsersResponse<T = Record<string, unknown>> {
   data: T[];
 }
 
+/** RebTools user PUT may include activation-email meta when status becomes active */
+export interface SatelliteUserUpdateResponse {
+  success: boolean;
+  data?: {
+    activationEmailSent?: boolean;
+    activationEmailSkipped?: boolean;
+    activationEmailError?: string | null;
+  };
+}
+
 export const satellitesApi = {
   list: () => apiRequest<SatellitesResponse>('GET', '/api/satellites'),
   getActive: (sessionId?: string) =>
@@ -197,7 +207,7 @@ export const satellitesApi = {
           `/api/satellites/${encodeURIComponent(satellite)}/users/edit`,
           payload
         )
-      : apiRequest<{ success: boolean }>(
+      : apiRequest<SatelliteUserUpdateResponse>(
           'PUT',
           `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(id))}`,
           payload

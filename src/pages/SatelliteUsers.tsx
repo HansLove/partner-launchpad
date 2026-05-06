@@ -175,19 +175,42 @@ export default function SatelliteUsers() {
     setIsUpdating(true);
     try {
       if (activeSatellite === 'rebatetools') {
-        await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
+        const updateRes = await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
           name: editData.name,
           email: editData.email,
           password: editData.password || undefined,
           rol: Number(editData.rol),
           status: Number(editData.status),
         });
+        const mail = updateRes.data;
+        if (mail?.activationEmailSkipped) {
+          toast({
+            title: 'User updated',
+            description:
+              'Activation email was not sent: set RESEND_API_KEY and RESEND_FROM_EMAIL on partners-portal-api (.env), then restart the API.',
+            variant: 'destructive',
+          });
+        } else if (mail?.activationEmailError) {
+          toast({
+            title: 'User updated',
+            description: `Activation email failed: ${mail.activationEmailError}`,
+            variant: 'destructive',
+          });
+        } else if (mail?.activationEmailSent) {
+          toast({
+            title: 'User updated',
+            description: 'Activation email sent.',
+          });
+        } else {
+          toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
+        }
       } else if (activeSatellite === 'msgchat') {
         await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
           email: editData.email,
           profile: editData.profile,
           ...(editData.password ? { password: editData.password } : {}),
         });
+        toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
       } else {
         await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
           email: String(editingRow.email ?? editData.email),
@@ -195,8 +218,8 @@ export default function SatelliteUsers() {
           userName: editData.userName || editData.email,
           ...(editData.password ? { password: editData.password } : {}),
         });
+        toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
       }
-      toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
       setIsEditOpen(false);
       setEditingRow(null);
       await loadUsers();
