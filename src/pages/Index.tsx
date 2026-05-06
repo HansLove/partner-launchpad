@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { ToolCard } from '@/components/ToolCard';
+import { useAuth } from '@/contexts/AuthContext';
 import { BarChart3, MessageCircle, Send, ArrowRight, Sparkles } from 'lucide-react';
 
 const tools = [
@@ -29,6 +30,14 @@ const tools = [
 ];
 
 export default function Index() {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const primaryHref = isAuthenticated ? '/dashboard' : '/login';
+  const primaryLabel = isLoading
+    ? 'Checking access...'
+    : isAuthenticated
+      ? 'Continue to dashboard'
+      : 'Sign in';
+
   return (
     <Layout>
       {/* Hero Section */}
@@ -44,19 +53,36 @@ export default function Index() {
             </div>
             
             <h1 className="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl animate-fade-in animation-delay-100">
-              Partner Access
+              {isAuthenticated ? `Welcome back${user?.name ? `, ${user.name}` : ''}` : 'Partner Access'}
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl animate-fade-in animation-delay-200">
-              Sign in to access powerful tools for analytics, messaging, and partner management.
+              {isAuthenticated
+                ? 'You are signed in. Continue to manage platform users, satellite access, and partner tools.'
+                : 'Sign in to access powerful tools for analytics, messaging, and partner management.'}
             </p>
             
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in animation-delay-300">
-              <Button size="xl" className="group" asChild>
-                <Link to="/login">
-                  Sign in
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </Link>
+              <Button size="xl" className="group" disabled={isLoading} asChild={!isLoading}>
+                {isLoading ? (
+                  <span>
+                    {primaryLabel}
+                    <ArrowRight className="h-5 w-5" />
+                  </span>
+                ) : (
+                  <Link to={primaryHref}>
+                    {primaryLabel}
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                )}
               </Button>
+              {isAuthenticated && (
+                <Button size="xl" variant="outline" asChild>
+                  <Link to="/dashboard/satellites/users">
+                    Manage satellite users
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -92,13 +118,22 @@ export default function Index() {
           <div className="mx-auto max-w-2xl animate-fade-in">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to get started?</h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              This portal is restricted. If you have access, use your credentials to sign in.
+              {isAuthenticated
+                ? 'Your session is active. Jump back into the admin workspace when you are ready.'
+                : 'This portal is restricted. If you have access, use your credentials to sign in.'}
             </p>
-            <Button size="lg" className="mt-8 group" asChild>
-              <Link to="/login">
-                Go to sign in
-                <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </Link>
+            <Button size="lg" className="mt-8 group" disabled={isLoading} asChild={!isLoading}>
+              {isLoading ? (
+                <span>
+                  {primaryLabel}
+                  <ArrowRight className="h-5 w-5" />
+                </span>
+              ) : (
+                <Link to={primaryHref}>
+                  {isAuthenticated ? 'Open dashboard' : 'Go to sign in'}
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </Link>
+              )}
             </Button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -98,7 +98,7 @@ export default function SatelliteUsers() {
 
   const isApiSatellite = activeSatellite === 'msgchat' || activeSatellite === 'telebulk';
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await satellitesApi.listUsers(activeSatellite);
@@ -110,12 +110,11 @@ export default function SatelliteUsers() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeSatellite, toast]);
 
   useEffect(() => {
     void loadUsers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSatellite]);
+  }, [loadUsers]);
 
   const tableColumns = useMemo(() => {
     const base = ['id', 'name', 'email'];
@@ -177,14 +176,14 @@ export default function SatelliteUsers() {
     setIsUpdating(true);
     try {
       if (activeSatellite === 'rebatetools') {
-        const response = await satellitesApi.updateRebToolsUser(String(editingRow.id), {
+        const updateRes = await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
           name: editData.name,
           email: editData.email,
           password: editData.password || undefined,
           rol: Number(editData.rol),
           status: Number(editData.status),
         });
-        const emailState = response?.data;
+        const emailState = updateRes.data;
         if (!emailState?.activationEmailAttempted) {
           toast({
             title: 'User updated (no email)',
@@ -199,7 +198,8 @@ export default function SatelliteUsers() {
         } else if (emailState.activationEmailSkipped) {
           toast({
             title: 'User updated (email skipped)',
-            description: 'Activation email was skipped due to email service configuration.',
+            description:
+              'Activation email was skipped. Check RESEND_API_KEY and RESEND_FROM_EMAIL in the API .env, then restart the API.',
             variant: 'destructive',
           });
         } else if (emailState.activationEmailSent) {
@@ -224,6 +224,7 @@ export default function SatelliteUsers() {
           profile: editData.profile,
           ...(editData.password ? { password: editData.password } : {}),
         });
+        toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
       } else {
         await satellitesApi.updateUser(activeSatellite, String(editingRow.id), {
           email: String(editingRow.email ?? editData.email),
@@ -231,9 +232,6 @@ export default function SatelliteUsers() {
           userName: editData.userName || editData.email,
           ...(editData.password ? { password: editData.password } : {}),
         });
-        toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
-      }
-      if (activeSatellite === 'msgchat') {
         toast({ title: 'User updated', description: 'Satellite user updated successfully.' });
       }
       setIsEditOpen(false);
