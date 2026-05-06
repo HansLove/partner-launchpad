@@ -167,7 +167,8 @@ export interface SatelliteUsersResponse<T = Record<string, unknown>> {
   data: T[];
 }
 
-export interface RebToolsUpdateResponse {
+/** RebTools user PUT may include activation-email meta when status becomes active */
+export interface SatelliteUserUpdateResponse {
   success: boolean;
   data?: {
     activationEmailAttempted?: boolean;
@@ -204,12 +205,12 @@ export const satellitesApi = {
     payload: Record<string, unknown>
   ) =>
     satellite === 'telebulk'
-      ? apiRequest<{ success: boolean }>(
+      ? apiRequest<SatelliteUserUpdateResponse>(
           'PUT',
           `/api/satellites/${encodeURIComponent(satellite)}/users/edit`,
           payload
         )
-      : apiRequest<{ success: boolean }>(
+      : apiRequest<SatelliteUserUpdateResponse>(
           'PUT',
           `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(id))}`,
           payload
@@ -218,7 +219,7 @@ export const satellitesApi = {
     id: string | number,
     payload: Record<string, unknown>
   ) =>
-    apiRequest<RebToolsUpdateResponse>(
+    apiRequest<SatelliteUserUpdateResponse>(
       'PUT',
       `/api/satellites/rebatetools/users/${encodeURIComponent(String(id))}`,
       payload
