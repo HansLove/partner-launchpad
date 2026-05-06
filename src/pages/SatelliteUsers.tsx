@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSatellite } from '@/contexts/SatelliteContext';
 import { satellitesApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Pencil, RefreshCw, UserPlus, Trash2 } from 'lucide-react';
+import { Pencil, RefreshCw, UserPlus, Trash2, LogIn } from 'lucide-react';
 
 type Row = Record<string, unknown>;
 
@@ -49,6 +49,11 @@ function normalizeMsgChatProfile(value: unknown): 'user' | 'admin' {
 function getDisplayName(slug: string, satellites: Record<string, string>) {
   return satellites[slug] || slug;
 }
+
+const rebToolsLoginBaseUrl = (
+  import.meta.env.VITE_REBTOOLS_LOGIN_URL ||
+  'https://rebatetools.com/login'
+).trim();
 
 function normalizeRows(rows: Row[]): Row[] {
   return rows.map((row) => ({
@@ -298,6 +303,20 @@ export default function SatelliteUsers() {
     }
   };
 
+  const openRebToolsLogin = (email: string) => {
+    const target = email.trim();
+    if (!target) {
+      toast({
+        title: 'Email missing',
+        description: 'This RebTools user has no email to prefill.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const loginUrl = `${rebToolsLoginBaseUrl}?email=${encodeURIComponent(target)}`;
+    window.open(loginUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <Layout>
       <div className="container py-8 sm:py-10">
@@ -356,6 +375,16 @@ export default function SatelliteUsers() {
                             <Badge variant="outline">{getRebToolsRoleLabel(row.rol)}</Badge>
                           ) : col === 'actions' ? (
                             <span className="flex items-center gap-1">
+                              {activeSatellite === 'rebatetools' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openRebToolsLogin(String(row.email ?? ''))}
+                                  title="Open RebTools login with this email"
+                                >
+                                  <LogIn className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit user">
                                 <Pencil className="h-4 w-4" />
                               </Button>
