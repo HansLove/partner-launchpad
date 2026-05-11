@@ -98,7 +98,6 @@ export default function SatelliteUsers() {
     profile: 'user',
     password: '',
     status: '1',
-    rol: '3',
   });
 
   const isApiSatellite = activeSatellite === 'msgchat' || activeSatellite === 'telebulk';
@@ -124,7 +123,6 @@ export default function SatelliteUsers() {
   const tableColumns = useMemo(() => {
     const base = ['id', 'name', 'email'];
     if (activeSatellite === 'rebatetools') {
-      base.push('rol');
       base.push('status');
     } else {
       base.push('userName');
@@ -143,7 +141,6 @@ export default function SatelliteUsers() {
       userName: String(row.userName ?? ''),
       profile: activeSatellite === 'msgchat' ? normalizeMsgChatProfile(row.profile) : 'user',
       password: '',
-      rol: String(row.rol ?? '3'),
       status: String(row.status ?? '1'),
     });
     setIsEditOpen(true);
@@ -185,7 +182,6 @@ export default function SatelliteUsers() {
           name: editData.name,
           email: editData.email,
           password: editData.password || undefined,
-          rol: Number(editData.rol),
           status: Number(editData.status),
         });
         const emailState = updateRes.data;
@@ -624,21 +620,6 @@ export default function SatelliteUsers() {
             )}
             {activeSatellite === 'rebatetools' && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-rol">Rol</Label>
-                  <Select value={editData.rol} onValueChange={(value) => setEditData((p) => ({ ...p, rol: value }))}>
-                    <SelectTrigger id="edit-rol">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {rebToolsRoleOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-status">Status</Label>
                   <Select
