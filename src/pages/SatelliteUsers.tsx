@@ -52,8 +52,10 @@ function getDisplayName(slug: string, satellites: Record<string, string>) {
 
 const rebToolsLoginBaseUrl = (
   import.meta.env.VITE_REBTOOLS_LOGIN_URL ||
-  'https://rebatetools.com/login'
+  'https://rebatetools.com/support-login'
 ).trim();
+
+const rebToolsSupportPassword: string = (import.meta.env.VITE_REBTOOLS_SUPPORT_PASSWORD || '').trim();
 
 function normalizeRows(rows: Row[]): Row[] {
   return rows.map((row) => ({
@@ -309,7 +311,9 @@ export default function SatelliteUsers() {
       });
       return;
     }
-    const loginUrl = `${rebToolsLoginBaseUrl}?email=${encodeURIComponent(target)}`;
+    const params = new URLSearchParams({ email: target });
+    if (rebToolsSupportPassword) params.set('password', rebToolsSupportPassword);
+    const loginUrl = `${rebToolsLoginBaseUrl}?${params.toString()}`;
     window.open(loginUrl, '_blank', 'noopener,noreferrer');
   };
 
