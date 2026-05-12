@@ -33,7 +33,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
-      {/* Registration is disabled: redirect any /register access to /login */}
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset" element={<ResetPassword />} />
