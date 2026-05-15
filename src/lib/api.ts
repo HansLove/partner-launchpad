@@ -167,6 +167,23 @@ export interface SatelliteUsersResponse<T = Record<string, unknown>> {
   data: T[];
 }
 
+export type AccountStatus = 'not_connected' | 'syncing' | 'connected';
+
+export interface UserScrapeStatus {
+  account_status: AccountStatus;
+  last_used_at: string | null;
+  last_error: string | null;
+  broker_name: string | null;
+  current: number;
+  total: number;
+  currentDate: string | null;
+}
+
+export interface RebtoolsScrapeStatusResponse {
+  success: boolean;
+  data: Record<string, UserScrapeStatus>;
+}
+
 /** RebTools user PUT may include activation-email meta when status becomes active */
 export interface SatelliteUserUpdateResponse {
   success: boolean;
@@ -235,4 +252,6 @@ export const satellitesApi = {
       satellites,
       password,
     }),
+  getRebtoolsScrapeStatus: () =>
+    apiRequest<RebtoolsScrapeStatusResponse>('GET', '/api/satellites/rebatetools/users/scrape-status'),
 };

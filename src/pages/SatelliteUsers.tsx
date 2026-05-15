@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useSatellite } from '@/contexts/SatelliteContext';
-import { satellitesApi } from '@/lib/api';
+import { satellitesApi, type UserScrapeStatus } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Pencil, RefreshCw, UserPlus, Trash2, LogIn } from 'lucide-react';
 
@@ -57,6 +58,11 @@ const rebToolsLoginBaseUrl = (
 
 const rebToolsSupportPassword: string = (import.meta.env.VITE_REBTOOLS_SUPPORT_PASSWORD || '').trim();
 
+function getColumnLabel(col: string): string {
+  if (col === 'account_status') return 'Account Status';
+  return col;
+}
+
 function normalizeRows(rows: Row[]): Row[] {
   return rows.map((row) => ({
     id: row.id ?? row._id ?? '',
@@ -102,6 +108,9 @@ export default function SatelliteUsers() {
     status: '1',
   });
 
+  const [scrapeStatus, setScrapeStatus] = useState<Record<string, UserScrapeStatus>>({});
+  const [isScrapeStatusLoading, setIsScrapeStatusLoading] = useState(false);
+
   const isApiSatellite = activeSatellite === 'msgchat' || activeSatellite === 'telebulk';
 
   const loadUsers = useCallback(async () => {
@@ -118,13 +127,31 @@ export default function SatelliteUsers() {
     }
   }, [activeSatellite, toast]);
 
+  const loadScrapeStatus = useCallback(async () => {
+    if (activeSatellite !== 'rebatetools') return;
+    setIsScrapeStatusLoading(true);
+    try {
+      const res = await satellitesApi.getRebtoolsScrapeStatus();
+      setScrapeStatus(res.data || {});
+    } catch {
+      setScrapeStatus({});
+    } finally {
+      setIsScrapeStatusLoading(false);
+    }
+  }, [activeSatellite]);
+
+  const reload = useCallback(async () => {
+    await Promise.all([loadUsers(), loadScrapeStatus()]);
+  }, [loadUsers, loadScrapeStatus]);
+
   useEffect(() => {
-    void loadUsers();
-  }, [loadUsers]);
+    void reload();
+  }, [reload]);
 
   const tableColumns = useMemo(() => {
     const base = ['id', 'name', 'email'];
     if (activeSatellite === 'rebatetools') {
+      base.push('account_status');
       base.push('status');
     } else {
       base.push('userName');
@@ -165,7 +192,7 @@ export default function SatelliteUsers() {
       toast({ title: 'User deleted', description: 'Satellite user was removed.' });
       setIsDeleteOpen(false);
       setRowToDelete(null);
-      await loadUsers();
+      await reload();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to delete user.';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
@@ -239,7 +266,7 @@ export default function SatelliteUsers() {
       }
       setIsEditOpen(false);
       setEditingRow(null);
-      await loadUsers();
+      await reload();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed updating user.';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
@@ -292,7 +319,7 @@ export default function SatelliteUsers() {
         status: '0',
         rol: '3',
       });
-      await loadUsers();
+      await reload();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed creating user.';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
@@ -328,7 +355,7 @@ export default function SatelliteUsers() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => void loadUsers()} disabled={isLoading}>
+            <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
@@ -358,7 +385,7 @@ export default function SatelliteUsers() {
                 <TableHeader>
                   <TableRow>
                     {tableColumns.map((col) => (
-                      <TableHead key={col}>{col}</TableHead>
+                      <TableHead key={col}>{getColumnLabel(col)}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -367,7 +394,35 @@ export default function SatelliteUsers() {
                     <TableRow key={`${String(row.id || idx)}`}>
                       {tableColumns.map((col) => (
                         <TableCell key={col}>
-                          {col === 'status' && activeSatellite === 'rebatetools' ? (
+                          {col === 'account_status' && activeSatellite === 'rebatetools' ? (
+                          (() => {
+                            const s = scrapeStatus[String(row.id)]?.account_status;
+                            if (isScrapeStatusLoading) return <span className="text-muted-foreground text-xs">…</span>;
+                            if (s === 'connected') return <Badge variant="success">Connected</Badge>;
+                            if (s === 'syncing') {
+                              const entry = scrapeStatus[String(row.id)];
+                              const pct = entry?.total > 0
+                                ? Math.round((entry.current / entry.total) * 100)
+                                : null;
+                              return (
+                                <div className="flex flex-col gap-1 min-w-[120px]">
+                                  <div className="flex items-center justify-between">
+                                    <Badge variant="warning">Syncing</Badge>
+                                    {pct !== null && (
+                                      <span className="text-xs text-muted-foreground">{pct}%</span>
+                                    )}
+                                  </div>
+                                  {pct !== null ? (
+                                    <Progress value={pct} className="h-1.5 w-full" />
+                                  ) : (
+                                    <div className="h-1.5 w-full rounded-full bg-primary/30 animate-pulse" />
+                                  )}
+                                </div>
+                              );
+                            }
+                            return <Badge variant="secondary">Not Connected</Badge>;
+                          })()
+                        ) : col === 'status' && activeSatellite === 'rebatetools' ? (
                             <Badge variant={String(row.status ?? '') === '1' ? 'success' : 'secondary'}>
                               {getRebToolsStatusLabel(row.status)}
                             </Badge>
