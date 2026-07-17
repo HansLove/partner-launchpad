@@ -1,4 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,12 +10,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useSatellite } from '@/contexts/SatelliteContext';
 import { satellitesApi, type UserScrapeStatus } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Pencil, RefreshCw, UserPlus, Trash2, LogIn } from 'lucide-react';
+import { ChevronDown, KeyRound, LayoutGrid, LayoutList, LogIn, Pencil, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import { BrokerIbDetailPanel, BrokerSummaryBadges } from '@/pages/satellite-users/BrokerIbDetails';
+import { cn } from '@/lib/utils';
 
 type Row = Record<string, unknown>;
+type UsersLayoutMode = 'table' | 'cards';
+
+const LAYOUT_STORAGE_KEY = 'satellite-users-layout';
+
+function formatCreatedAt(value: unknown): string {
+  if (value == null || value === '') return '';
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return format(date, 'MMM d, yyyy · h:mm a');
+}
+
+function readStoredLayout(): UsersLayoutMode {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (raw === 'cards' || raw === 'table') return raw;
+  } catch {
+    // ignore
+  }
+  return 'table';
+}
 
 const rebToolsRoleOptions = [
   { value: '3', label: 'Partner (3)' },
@@ -60,6 +84,9 @@ const rebToolsSupportPassword: string = (import.meta.env.VITE_REBTOOLS_SUPPORT_P
 
 function getColumnLabel(col: string): string {
   if (col === 'account_status') return 'Account Status';
+  if (col === 'brokers') return 'Brokers';
+  if (col === 'created_at') return 'Created';
+  if (col === 'expand') return '';
   return col;
 }
 
@@ -110,8 +137,30 @@ export default function SatelliteUsers() {
 
   const [scrapeStatus, setScrapeStatus] = useState<Record<string, UserScrapeStatus>>({});
   const [isScrapeStatusLoading, setIsScrapeStatusLoading] = useState(false);
+  const [usersLayout, setUsersLayout] = useState<UsersLayoutMode>(() => readStoredLayout());
+  const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(() => new Set());
+  const [resetSendingId, setResetSendingId] = useState<string | null>(null);
 
   const isApiSatellite = activeSatellite === 'msgchat' || activeSatellite === 'telebulk';
+  const isRebTools = activeSatellite === 'rebatetools';
+
+  const setLayoutMode = (mode: UsersLayoutMode) => {
+    setUsersLayout(mode);
+    try {
+      localStorage.setItem(LAYOUT_STORAGE_KEY, mode);
+    } catch {
+      // ignore
+    }
+  };
+
+  const toggleExpanded = (userId: string) => {
+    setExpandedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
@@ -148,10 +197,15 @@ export default function SatelliteUsers() {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    setExpandedUserIds(new Set());
+  }, [activeSatellite]);
+
   const tableColumns = useMemo(() => {
-    const base = ['id', 'name', 'email'];
-    if (activeSatellite === 'rebatetools') {
-      base.push('account_status');
+    const base = isRebTools ? ['expand', 'id', 'name', 'email'] : ['id', 'name', 'email'];
+    if (isRebTools) {
+      // base.push('account_status');
+      base.push('brokers');
       base.push('status');
     } else {
       base.push('userName');
@@ -160,7 +214,104 @@ export default function SatelliteUsers() {
     base.push('created_at');
     base.push('actions');
     return base;
-  }, [activeSatellite]);
+  }, [isRebTools]);
+
+  function renderAccountStatus(userId: string) {
+    const s = scrapeStatus[userId]?.account_status;
+    if (isScrapeStatusLoading) return <span className="text-muted-foreground text-xs">…</span>;
+    if (s === 'connected') return <Badge variant="success">Connected</Badge>;
+    if (s === 'syncing') {
+      const entry = scrapeStatus[userId];
+      const pct = entry?.total > 0 ? Math.round((entry.current / entry.total) * 100) : null;
+      return (
+        <div className="flex min-w-[120px] flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="warning">Syncing</Badge>
+            {pct !== null && <span className="text-xs text-muted-foreground">{pct}%</span>}
+          </div>
+          {pct !== null ? (
+            <Progress value={pct} className="h-1.5 w-full" />
+          ) : (
+            <div className="h-1.5 w-full animate-pulse rounded-full bg-primary/30" />
+          )}
+        </div>
+      );
+    }
+    return <Badge variant="secondary">Not Connected</Badge>;
+  }
+
+  function renderRowActions(row: Row) {
+    const userId = String(row.id ?? '');
+    const isSendingReset = resetSendingId === userId;
+    return (
+      <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        {isRebTools && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openRebToolsLogin(String(row.email ?? ''))}
+              title="Open RebTools login with this email"
+            >
+              <LogIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!userId || isSendingReset}
+              onClick={() => void handleSendReset(row)}
+              title="Send password reset email"
+            >
+              <KeyRound className={cn('h-4 w-4', isSendingReset && 'animate-pulse')} />
+            </Button>
+          </>
+        )}
+        <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit user">
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setRowToDelete(row);
+            setIsDeleteOpen(true);
+          }}
+          title="Delete user"
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </span>
+    );
+  }
+
+  const handleSendReset = async (row: Row) => {
+    const userId = String(row.id ?? '');
+    if (!userId) return;
+    const email = String(row.email ?? '').trim();
+    if (!email) {
+      toast({
+        title: 'Email missing',
+        description: 'This user has no email. Add an email before sending a reset link.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setResetSendingId(userId);
+    try {
+      const res = await satellitesApi.sendRebToolsPasswordReset(userId);
+      toast({
+        title: 'Reset email sent',
+        description: `Password reset link sent to ${res.data?.email || email}.`,
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to send reset email.';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    } finally {
+      setResetSendingId(null);
+    }
+  };
 
   const openEdit = (row: Row) => {
     setEditingRow(row);
@@ -354,7 +505,29 @@ export default function SatelliteUsers() {
               Manage users on {getDisplayName(activeSatellite, satellites)}.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isRebTools && (
+              <ToggleGroup
+                type="single"
+                value={usersLayout}
+                onValueChange={(value) => {
+                  if (value === 'table' || value === 'cards') setLayoutMode(value);
+                }}
+                variant="outline"
+                size="sm"
+                className="justify-start"
+                aria-label="Users layout"
+              >
+                <ToggleGroupItem value="table" aria-label="Table layout" className="gap-1.5 px-3">
+                  <LayoutList className="h-4 w-4" />
+                  Table
+                </ToggleGroupItem>
+                <ToggleGroupItem value="cards" aria-label="Cards layout" className="gap-1.5 px-3">
+                  <LayoutGrid className="h-4 w-4" />
+                  Cards
+                </ToggleGroupItem>
+              </ToggleGroup>
+            )}
             <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -372,7 +545,9 @@ export default function SatelliteUsers() {
             <CardDescription>
               {isApiSatellite
                 ? 'Users are managed via satellite API integration.'
-                : 'Users are managed directly in the satellite MySQL database.'}
+                : isRebTools
+                  ? 'Users are managed in the RebTools database. Switch Table/Cards to inspect connected brokers and scraped IBs.'
+                  : 'Users are managed directly in the satellite MySQL database.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -380,89 +555,139 @@ export default function SatelliteUsers() {
               <div className="py-8 text-center text-muted-foreground">Loading users...</div>
             ) : rows.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">No users found on this satellite.</div>
+            ) : isRebTools && usersLayout === 'cards' ? (
+              <div className="space-y-3">
+                {rows.map((row, idx) => {
+                  const userId = String(row.id ?? idx);
+                  const status = scrapeStatus[userId];
+                  return (
+                    <div
+                      key={userId}
+                      className="rounded-xl border bg-gradient-to-br from-background to-muted/30 p-4 shadow-sm transition hover:border-border/80"
+                    >
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-semibold tracking-tight">
+                              {String(row.name || 'Unnamed')}
+                            </h3>
+                            <Badge variant={String(row.status ?? '') === '1' ? 'success' : 'secondary'}>
+                              {getRebToolsStatusLabel(row.status)}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground tabular-nums">#{userId}</span>
+                          </div>
+                          <p className="truncate text-sm text-muted-foreground">{String(row.email ?? '')}</p>
+                          {row.created_at != null && String(row.created_at) !== '' && (
+                            <p className="text-[11px] text-muted-foreground">
+                              Created {formatCreatedAt(row.created_at)}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-6">
+                          {/* <div className="space-y-1.5">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Account
+                            </p>
+                            {renderAccountStatus(userId)}
+                          </div> */}
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Brokers
+                            </p>
+                            {isScrapeStatusLoading ? (
+                              <span className="text-xs text-muted-foreground">…</span>
+                            ) : (
+                              <BrokerSummaryBadges status={status} />
+                            )}
+                          </div>
+                          <div className="sm:ml-2">{renderRowActions(row)}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 border-t pt-4">
+                        {isScrapeStatusLoading ? (
+                          <p className="text-xs text-muted-foreground">Loading broker details…</p>
+                        ) : (
+                          <BrokerIbDetailPanel status={status} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     {tableColumns.map((col) => (
-                      <TableHead key={col}>{getColumnLabel(col)}</TableHead>
+                      <TableHead key={col} className={col === 'expand' ? 'w-8' : undefined}>
+                        {getColumnLabel(col)}
+                      </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row, idx) => (
-                    <TableRow key={`${String(row.id || idx)}`}>
-                      {tableColumns.map((col) => (
-                        <TableCell key={col}>
-                          {col === 'account_status' && activeSatellite === 'rebatetools' ? (
-                          (() => {
-                            const s = scrapeStatus[String(row.id)]?.account_status;
-                            if (isScrapeStatusLoading) return <span className="text-muted-foreground text-xs">…</span>;
-                            if (s === 'connected') return <Badge variant="success">Connected</Badge>;
-                            if (s === 'syncing') {
-                              const entry = scrapeStatus[String(row.id)];
-                              const pct = entry?.total > 0
-                                ? Math.round((entry.current / entry.total) * 100)
-                                : null;
-                              return (
-                                <div className="flex flex-col gap-1 min-w-[120px]">
-                                  <div className="flex items-center justify-between">
-                                    <Badge variant="warning">Syncing</Badge>
-                                    {pct !== null && (
-                                      <span className="text-xs text-muted-foreground">{pct}%</span>
-                                    )}
-                                  </div>
-                                  {pct !== null ? (
-                                    <Progress value={pct} className="h-1.5 w-full" />
-                                  ) : (
-                                    <div className="h-1.5 w-full rounded-full bg-primary/30 animate-pulse" />
+                  {rows.map((row, idx) => {
+                    const userId = String(row.id ?? idx);
+                    const isExpanded = isRebTools && expandedUserIds.has(userId);
+                    const colSpan = tableColumns.length;
+                    return (
+                      <Fragment key={userId}>
+                        <TableRow
+                          className={cn(isRebTools && 'cursor-pointer', isExpanded && 'bg-muted/40')}
+                          onClick={isRebTools ? () => toggleExpanded(userId) : undefined}
+                        >
+                          {tableColumns.map((col) => (
+                            <TableCell key={col}>
+                              {col === 'expand' ? (
+                                <ChevronDown
+                                  className={cn(
+                                    'h-4 w-4 text-muted-foreground transition-transform',
+                                    isExpanded && 'rotate-180'
                                   )}
-                                </div>
-                              );
-                            }
-                            return <Badge variant="secondary">Not Connected</Badge>;
-                          })()
-                        ) : col === 'status' && activeSatellite === 'rebatetools' ? (
-                            <Badge variant={String(row.status ?? '') === '1' ? 'success' : 'secondary'}>
-                              {getRebToolsStatusLabel(row.status)}
-                            </Badge>
-                          ) : col === 'rol' && activeSatellite === 'rebatetools' ? (
-                            <Badge variant="outline">{getRebToolsRoleLabel(row.rol)}</Badge>
-                          ) : col === 'actions' ? (
-                            <span className="flex items-center gap-1">
-                              {activeSatellite === 'rebatetools' && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openRebToolsLogin(String(row.email ?? ''))}
-                                  title="Open RebTools login with this email"
-                                >
-                                  <LogIn className="h-4 w-4" />
-                                </Button>
+                                />
+                              ) : col === 'account_status' && isRebTools ? (
+                                renderAccountStatus(userId)
+                              ) : col === 'brokers' && isRebTools ? (
+                                isScrapeStatusLoading ? (
+                                  <span className="text-xs text-muted-foreground">…</span>
+                                ) : (
+                                  <BrokerSummaryBadges status={scrapeStatus[userId]} />
+                                )
+                              ) : col === 'status' && isRebTools ? (
+                                <Badge variant={String(row.status ?? '') === '1' ? 'success' : 'secondary'}>
+                                  {getRebToolsStatusLabel(row.status)}
+                                </Badge>
+                              ) : col === 'rol' && isRebTools ? (
+                                <Badge variant="outline">{getRebToolsRoleLabel(row.rol)}</Badge>
+                              ) : col === 'actions' ? (
+                                renderRowActions(row)
+                              ) : col === 'created_at' ? (
+                                formatCreatedAt(row.created_at)
+                              ) : (
+                                String(row[col] ?? '')
                               )}
-                              <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit user">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setRowToDelete(row);
-                                  setIsDeleteOpen(true);
-                                }}
-                                title="Delete user"
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </span>
-                          ) : (
-                            String(row[col] ?? '')
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow className="hover:bg-transparent">
+                            <TableCell colSpan={colSpan} className="bg-muted/20 p-4">
+                              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Connected brokers & scraped IBs
+                              </div>
+                              {isScrapeStatusLoading ? (
+                                <p className="text-xs text-muted-foreground">Loading broker details…</p>
+                              ) : (
+                                <BrokerIbDetailPanel status={scrapeStatus[userId]} />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

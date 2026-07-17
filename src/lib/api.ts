@@ -169,6 +169,23 @@ export interface SatelliteUsersResponse<T = Record<string, unknown>> {
 
 export type AccountStatus = 'not_connected' | 'syncing' | 'connected';
 
+export interface UserBrokerConnection {
+  slug: string;
+  broker_name: string | null;
+  broker_email: string | null;
+  last_used_at: string | null;
+  last_error: string | null;
+  is_active: boolean;
+}
+
+export interface UserBrokerIb {
+  slug: string;
+  ib_rebate_account_login: string | null;
+  owner_name: string | null;
+  ib_level: number;
+  is_active: boolean;
+}
+
 export interface UserScrapeStatus {
   account_status: AccountStatus;
   last_used_at: string | null;
@@ -177,6 +194,8 @@ export interface UserScrapeStatus {
   current: number;
   total: number;
   currentDate: string | null;
+  brokers?: UserBrokerConnection[];
+  ibs?: UserBrokerIb[];
 }
 
 export interface RebtoolsScrapeStatusResponse {
@@ -245,6 +264,11 @@ export const satellitesApi = {
     apiRequest<{ success: boolean }>(
       'DELETE',
       `/api/satellites/${encodeURIComponent(satellite)}/users/${encodeURIComponent(String(identifier))}`
+    ),
+  sendRebToolsPasswordReset: (id: string | number) =>
+    apiRequest<{ success: boolean; data?: { email?: string; messageId?: string | null } }>(
+      'POST',
+      `/api/satellites/rebatetools/users/${encodeURIComponent(String(id))}/send-reset`
     ),
   provision: (userId: number, satellites: string[], password: string) =>
     apiRequest<ProvisionResponse>('POST', '/api/satellites/provision', {
