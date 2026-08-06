@@ -137,6 +137,7 @@ export default function SatelliteUsers() {
 
   const [scrapeStatus, setScrapeStatus] = useState<Record<string, UserScrapeStatus>>({});
   const [isScrapeStatusLoading, setIsScrapeStatusLoading] = useState(false);
+  const [networkCheckingIds, setNetworkCheckingIds] = useState<Set<string>>(() => new Set());
   const [usersLayout, setUsersLayout] = useState<UsersLayoutMode>(() => readStoredLayout());
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(() => new Set());
   const [resetSendingId, setResetSendingId] = useState<string | null>(null);
@@ -188,6 +189,50 @@ export default function SatelliteUsers() {
       setIsScrapeStatusLoading(false);
     }
   }, [activeSatellite]);
+
+  const handleCheckNetwork = useCallback(
+    async (userId: string) => {
+      setNetworkCheckingIds((prev) => new Set(prev).add(userId));
+      try {
+        const res = await satellitesApi.checkRebtoolsNetworkAttribution(userId);
+        setScrapeStatus((prev) => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {
+              account_status: 'connected',
+              last_used_at: null,
+              last_error: null,
+              broker_name: null,
+              current: 0,
+              total: 0,
+              currentDate: null,
+            }),
+            network_attributions: res.data || [],
+          },
+        }));
+        const primary = res.data?.[0];
+        toast({
+          title: 'Network check complete',
+          description:
+            primary?.network_status === 'in_network'
+              ? `In network${primary.related_owner_name ? ` under ${primary.related_owner_name}` : ''}.`
+              : primary?.network_status === 'standalone'
+                ? 'Standalone — not under any other scraped account.'
+                : 'Network attribution updated.',
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Network check failed.';
+        toast({ title: 'Network check failed', description: msg, variant: 'destructive' });
+      } finally {
+        setNetworkCheckingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    },
+    [toast]
+  );
 
   const reload = useCallback(async () => {
     await Promise.all([loadUsers(), loadScrapeStatus()]);
@@ -609,7 +654,11 @@ export default function SatelliteUsers() {
                         {isScrapeStatusLoading ? (
                           <p className="text-xs text-muted-foreground">Loading broker details…</p>
                         ) : (
-                          <BrokerIbDetailPanel status={status} />
+                          <BrokerIbDetailPanel
+                            status={status}
+                            isCheckingNetwork={networkCheckingIds.has(userId)}
+                            onCheckNetwork={() => void handleCheckNetwork(userId)}
+                          />
                         )}
                       </div>
                     </div>
@@ -680,7 +729,11 @@ export default function SatelliteUsers() {
                               {isScrapeStatusLoading ? (
                                 <p className="text-xs text-muted-foreground">Loading broker details…</p>
                               ) : (
-                                <BrokerIbDetailPanel status={scrapeStatus[userId]} />
+                                <BrokerIbDetailPanel
+                                  status={scrapeStatus[userId]}
+                                  isCheckingNetwork={networkCheckingIds.has(userId)}
+                                  onCheckNetwork={() => void handleCheckNetwork(userId)}
+                                />
                               )}
                             </TableCell>
                           </TableRow>

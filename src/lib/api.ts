@@ -186,6 +186,29 @@ export interface UserBrokerIb {
   is_active: boolean;
 }
 
+export type NetworkStatus = 'in_network' | 'standalone' | 'no_ib' | 'check_failed';
+
+export interface NetworkAttribution {
+  id?: number | null;
+  rebtools_user_id: number;
+  broker_slug: string;
+  ib_rebate_account_login: string | null;
+  network_status: NetworkStatus;
+  related_rebtools_user_id: number | null;
+  related_owner_name: string | null;
+  related_main_ib_login: string | null;
+  upline_chain: Array<{
+    owner_name: string;
+    rebate_account_login: string | null;
+    ib_level: number | null;
+    rebtools_user_id: number;
+  }>;
+  checked_at: string | null;
+  checked_by_portal_user_id?: number | null;
+  related_user_name?: string | null;
+  related_user_email?: string | null;
+}
+
 export interface UserScrapeStatus {
   account_status: AccountStatus;
   last_used_at: string | null;
@@ -196,6 +219,12 @@ export interface UserScrapeStatus {
   currentDate: string | null;
   brokers?: UserBrokerConnection[];
   ibs?: UserBrokerIb[];
+  network_attributions?: NetworkAttribution[];
+}
+
+export interface NetworkAttributionResponse {
+  success: boolean;
+  data: NetworkAttribution[];
 }
 
 export interface RebtoolsScrapeStatusResponse {
@@ -278,4 +307,14 @@ export const satellitesApi = {
     }),
   getRebtoolsScrapeStatus: () =>
     apiRequest<RebtoolsScrapeStatusResponse>('GET', '/api/satellites/rebatetools/users/scrape-status'),
+  getRebtoolsNetworkAttribution: (id: string | number) =>
+    apiRequest<NetworkAttributionResponse>(
+      'GET',
+      `/api/satellites/rebatetools/users/${encodeURIComponent(String(id))}/network-attribution`
+    ),
+  checkRebtoolsNetworkAttribution: (id: string | number) =>
+    apiRequest<NetworkAttributionResponse>(
+      'POST',
+      `/api/satellites/rebatetools/users/${encodeURIComponent(String(id))}/network-attribution/check`
+    ),
 };
